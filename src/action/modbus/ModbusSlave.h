@@ -1,5 +1,5 @@
-#ifndef MB_MODBUS_MASTER_H
-#define MB_MODBUS_MASTER_H
+#ifndef MB_MODBUS_SLAVE_H
+#define MB_MODBUS_SLAVE_H
 
 #include "ModbusConnection.h"
 #include "modbus.h"
@@ -11,11 +11,11 @@ namespace action {
 
 using namespace mb::types;
 
-class ModbusMaster  {
+class ModbusSlave  {
 public:
     /** @brief Constructor */
-    ModbusMaster(ModbusConnection& connection);
-    ~ModbusMaster();
+    ModbusSlave(ModbusConnection& connection);
+    ~ModbusSlave();
 
     bool setContext();
     bool setContext(const ModbusConnection& connection);

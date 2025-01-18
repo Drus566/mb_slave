@@ -2,9 +2,14 @@
 #define MB_MODBUS_SLAVE_H
 
 #include "ModbusConnection.h"
+#include "ModbusRegister.h"
 #include "modbus.h"
 
+#define MB_QUERY_LENGTH MODBUS_TCP_MAX_ADU_LENGTH
+
 #include <cstdint>
+#include <vector>
+#include <forward_list>
 
 namespace mb {
 namespace action {
@@ -23,6 +28,15 @@ public:
     /** @brief connect on current context */
     bool connect();
 
+    /** @brief create memory for process requests on current context */
+    bool createMemory(int nb_bits, int nb_input_bits, int nb_registers, int nb_input_registers);
+
+    /** @brief create memory for process requests on current context */
+    bool createMemory(int start_bits, int nb_bits,
+                      int start_input_bits, int nb_input_bits,
+                      int start_registers, int nb_registers,
+                      int start_input_registers, int nb_input_registers);
+
     /** @brief set response timeoute */
     bool setResponseTimeout();
 
@@ -38,46 +52,82 @@ public:
     /** @brief get slave id */
     bool getSlave(int& slave_id);
 
-    /** @brief read bits */
-    bool readBits(int slave_id, int addr, int count, uint8_t* dest);
+    /** @brief create and listen a TCP Modbus socket */
+    bool modbusTcpListen(int nb_connection);
 
-    /** @brief read input bits */
-    bool readInputBits(int slave_id, int addr, int count, uint8_t* dest);
+    /** @brief get server socket */
+    int getServerSocket();
 
-    /** @brief read registers */
-    bool readRegisters(int slave_id, int addr, int count, uint16_t* dest);
+    /** @brief accept a new connection on a TCP Modbus socket */
+    bool modbusTcpAccept();
 
-    /** @brief read input registers */
-    bool readInputRegisters(int slave_id, int addr, int count, uint16_t* dest);
+    /** @brief get client sockets */
+    std::vector<int>& getClientSockets();
+    
+    /** @brief get client socket */
+    int getClientSocket();
 
-    /** @brief write bit */
-    bool writeBit(int slave_id, int addr, int bit);
+    /** @brief receive query */
+    bool modbusReceive();
 
-    /** @brief write bits */
-    bool writeBits(int slave_id, int addr, int number, const uint8_t* bits);
+    /** @brief reply for query */
+    bool modbusReply();
 
-    /** @brief write register */
-    bool writeRegister(int slave_id, int addr, const uint16_t value);
-
-    /** @brief write registers */
-    bool writeRegisters(int slave_id, int addr, int number, const uint16_t* values);
+    /** @brief get last query message */
+    bool getQueryMessage(uint8_t*& message, int& length);
 
     /** @brief flush modbus buffer */
     bool flush();
 
+    /** @brief close modbus server socket */
+    void serverSocketClose();
+
+    /** @brief close modbus clients socket */
+    void clientSocketsClose();
+
+    /** @brief close modbus socket */
+    void socketClose(int socket);
+
     /** @brief close modbus connection on current context */
-    void close();
+    void modbusClose();
 
     /** @brief free modbus current context */
     void free();
+
+    /** @brief free modbus memory */
+    void freeMemory();
+
+    /** @brief fill map with values */
+    void fillModbusMemory(std::forward_list<Register>& regs);
     
 private:
+    struct ModbusMemory {
+        int offset_bits = 0;
+        int offset_input_bits = 0;
+        int offset_regs = 0;
+        int offset_input_regs = 0;
+        int length_bits = 0;
+        int length_input_bits = 0;
+        int length_regs = 0;
+        int length_input_regs = 0;
+        modbus_mapping_t* memory;
+    };
+
+    struct Query {
+        uint8_t query[MB_QUERY_LENGTH];
+        int length;
+    };
+
     ModbusConnection& m_connection;
-    /** @brief context modbus connection */
-    modbus_t* m_ctx;  
+    modbus_t* m_ctx;
+    ModbusMemory m_mem;
+    Query m_query;
+    int m_listen_socket;
+    int m_client_socket;
+    std::vector<int> m_client_sockets;
 };
 
 } // action
 } // mb
 
-#endif // MB_MODBUS_MASTER_H
+#endif // MB_MODBUS_SLAVE_H

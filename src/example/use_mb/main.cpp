@@ -1,20 +1,23 @@
-#include "IMB.h"
+#include "MbSlave.h"
 
 #include <iostream>
 #include <stdio.h>
 #include <thread>
 
 int main(void) {
+	
 	std::string path_config = "example.ini";
-	std::unique_ptr<mb::IMB> mb = mb::IMB::create(path_config);
-	bool result = mb->start();
-	mb::IMB::IData* g = mb->getData(200,4);
-	if (g == nullptr) std::cout << "GGWP" << std::endl;
-	g->getBit();
+	mb::MbSlave slave(path_config);
+	bool wait = true;
+	bool result = slave.start(wait);
 
-	while(true) {
-		std::this_thread::sleep_for(std::chrono::milliseconds(200));
-	}
+	// mb::IMB::IData* g = mb->getData(200,4);
+	// if (g == nullptr) std::cout << "GGWP" << std::endl;
+	// g->getBit();
+
+	// while(true) {
+	// 	std::this_thread::sleep_for(std::chrono::milliseconds(200));
+	// }
 	// g.getBit();
 	
 	// mb::MB mb(path_config);

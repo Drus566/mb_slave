@@ -1,6 +1,5 @@
 /** timing params */
-#define DEFAULT_TIME_BETWEEN_REQUESTS 10
-#define DEFAULT_RESPONSE_TIMEOUT 500
+#define DEFAULT_TCP_COUNT_CONNECTIONS 5
 
 /** rtu default params */
 #define DEFAULT_BAUDRATE 19200
@@ -9,34 +8,25 @@
 #define DEFAULT_PARITY 'N'
 
 /** ethernet default params */
-#define DEFAULT_IP "127.0.0.1"
-#define DEFAULT_PORT 502
+#define DEFAULT_IP "0.0.0.0"
+#define DEFAULT_PORT 5555
 
 #include "ActionManager.h"
 
-#include "ModbusMaster.h"
+#include "ModbusSlave.h"
+#include "MemoryMapInfo.h"
 
 #include <iostream>
+#include <poll.h>
 
 namespace mb {
 namespace action {
 
 ActionManager::ActionManager(Config* config, 
-									  DataManager* data_manager,
-									  MemManager* mem_manager) : m_config(config), 
-									  						  			  m_data_manager(data_manager),
-																		  m_mem_manager(mem_manager),
-							   		  					  			  m_run(false),
-																		  m_connect(false) {
-	m_time_between_requests = m_config->timeBetweenRequests();
-	m_response_timeout = m_config->responseTimeout();
-	m_poll_delay = m_config->pollDelay();
-
-	if (m_time_between_requests.count() == 0) m_time_between_requests = std::chrono::milliseconds(DEFAULT_TIME_BETWEEN_REQUESTS);
-	if (m_response_timeout.count() == 0) m_response_timeout = std::chrono::milliseconds(DEFAULT_RESPONSE_TIMEOUT);
-	
-	m_modbus_connection.response_timeout = m_response_timeout.count();
-
+									  DataManager* data_manager) : m_config(config), 
+									  						  			    m_data_manager(data_manager),
+							   		  					  			    m_run(false),
+																		    m_connect(false) {	
 	std::string type = m_config->type();
 	type = toUpperCase(type);
 
@@ -71,27 +61,48 @@ ActionManager::ActionManager(Config* config,
 		int port = m_config->port();
 		if (port == 0) port = DEFAULT_PORT;
 		m_modbus_connection.eth.port = port;
-	}
 
-	m_modbus_master = new ModbusMaster(m_modbus_connection);
+		int tcp_count_connections = m_config->tcpConnectionCount();
+		if (tcp_count_connections == 0) tcp_count_connections = DEFAULT_TCP_COUNT_CONNECTIONS;
+		m_modbus_connection.eth.tcp_count_connections = tcp_count_connections;
+	}
+	m_modbus_connection.slave_id = m_config->slaveId();
+
+	m_modbus_slave = new ModbusSlave(m_modbus_connection);
 } 
 
 ActionManager::~ActionManager() {
 	stop();
-	if (m_modbus_master) delete m_modbus_master;
+	if (m_modbus_slave) delete m_modbus_slave;
 }
 
-bool ActionManager::start() {
+bool ActionManager::start(bool wait) {
 	if (m_run.load()) return false;
 	
-	if (!m_modbus_master->setContext()) return false;
-	if (!m_modbus_master->connect()) return false;
-	
-	m_thread = std::thread(&ActionManager::payload, 
-									this, 
-									m_data_manager, 
-									m_mem_manager);
-	m_thread.detach();
+	if (!m_modbus_slave->setContext()) return false;
+
+	MemoryMapInfo mem_map_info;
+	m_data_manager->getMemoryMapInfo(mem_map_info);
+
+	if (!m_modbus_slave->createMemory(mem_map_info.start_bits, mem_map_info.nb_bits,
+												 mem_map_info.start_input_bits, mem_map_info.nb_input_bits,
+												 mem_map_info.start_registers, mem_map_info.nb_registers,
+												 mem_map_info.start_input_registers, mem_map_info.nb_input_registers)) {
+		return false;
+	}
+
+	m_modbus_slave->fillModbusMemory(m_data_manager->getRegs());
+
+	if (m_modbus_connection.type == ModbusConnectionType::RTU && !m_modbus_slave->connect()) {
+		return false;
+	}
+	else if (m_modbus_connection.type == ModbusConnectionType::ETH && !m_modbus_slave->modbusTcpListen(m_modbus_connection.eth.tcp_count_connections)) {
+		return false;
+	}
+
+	m_thread = std::thread(&ActionManager::payload, this);
+	if (!wait) m_thread.detach();
+	else m_thread.join();
 	
 	return true;
 }
@@ -101,7 +112,13 @@ bool ActionManager::stop() {
 	
 	if (m_thread.joinable()) m_thread.join();
 
-	m_modbus_master->close();
+	m_modbus_slave->modbusClose();
+	m_modbus_slave->freeMemory();
+
+	if (m_modbus_connection.type == ModbusConnectionType::ETH) {
+		m_modbus_slave->clientSocketsClose();
+		m_modbus_slave->serverSocketClose();
+	}
 
 	m_run.store(false);
 	return true;
@@ -111,63 +128,66 @@ bool ActionManager::isRun() { return m_run.load(); }
 
 bool ActionManager::isConnect() { return m_connect.load(); };
 
-void ActionManager::payload(DataManager* data_manager, MemManager* mem_manager) {
+void ActionManager::payload() {
 	m_run.store(true);
 
-	const std::vector<Request>& read_requests = data_manager->getReadRequests();
-	const int max_count_read_regs = data_manager->getMaxCountReadRegs();
-	
-	uint16_t buffer[max_count_read_regs];
-	uint8_t* u8_ptr = reinterpret_cast<uint8_t*>(buffer);
-	uint16_t* u16_ptr = buffer;
-	int error, max_error = 30;
-	bool response;
+	if (m_modbus_connection.type == ModbusConnectionType::RTU) rtuPayload();
+	else if (m_modbus_connection.type == ModbusConnectionType::ETH) tcpPayload();
+}
+
+void ActionManager::tcpPayload() {
+	int max_client_count = m_modbus_connection.eth.tcp_count_connections;
+	struct pollfd fds[max_client_count + 1];
+	int server_socket = m_modbus_slave->getServerSocket();
+	int client_socket;
+
+	for (int i = 0; i <= max_client_count; i++) {
+		fds[i].fd = -1;			// Инициализируем fd
+		fds[i].events = POLLIN; // Устанавливаем событие на чтение
+	}
+
+	fds[0].fd = server_socket; // Устанавливаем слушающий сокет
+	fds[0].events = POLLIN;
 
 	while (m_run.load()) {
-		for (const auto& request : read_requests) {
-			// std::cout << "Request: " 
-			// 			 << request.slave_id 
-			// 			 << ", " << request.function 
-			// 			 << ", " << request.address 
-			// 			 << std::endl;
-			switch (request.function) {
-				case FuncNumber::READ_COIL:
-					response = m_modbus_master->readBits(request.slave_id, request.address, request.quantity, u8_ptr); 
-					if (response) mem_manager->writeMem(u8_ptr, request.mem_chunk->u8_ptr, request.quantity, request.offset_mem_chunk);
-					break;
-				
-				case FuncNumber::READ_INPUT_COIL: 
-					response = m_modbus_master->readInputBits(request.slave_id, request.address, request.quantity, u8_ptr); 
-					if (response) mem_manager->writeMem(u8_ptr, request.mem_chunk->u8_ptr, request.quantity, request.offset_mem_chunk);
-					break;
-
-				case FuncNumber::READ_REGS: 
-					response = m_modbus_master->readRegisters(request.slave_id, request.address, request.quantity, u16_ptr); 
-					if (response) mem_manager->writeMem(u16_ptr, request.mem_chunk->u16_ptr, request.quantity, request.offset_mem_chunk);
-					break;
-
-				case FuncNumber::READ_INPUT_REGS:
-					response = m_modbus_master->readRegisters(request.slave_id, request.address, request.quantity, u16_ptr); 
-					if (response) mem_manager->writeMem(u16_ptr, request.mem_chunk->u16_ptr, request.quantity, request.offset_mem_chunk);
-					break;
-
-			}			
-
-			if (!response) ++error; 
-			else { 
-				error = 0;
-				m_connect.store(true);
-			}
-
-			if (error > max_error) { 
-				error = max_error;
-				m_connect.store(false);
-			}
-			std::this_thread::sleep_for(m_time_between_requests);
-			// TODO: check out requests
+		int poll_count = poll(fds, max_client_count + 1, -1); // Ожидаем события
+		if (poll_count < 0) {
+			std::cout << "poll error" << std::endl;
+			break;
 		}
-		std::this_thread::sleep_for(m_poll_delay);
+
+		// Проверяем слушающий сокет на наличие новых подключений
+		if (fds[0].revents & POLLIN) {
+			if (!m_modbus_slave->modbusTcpAccept()) continue;
+			client_socket = m_modbus_slave->getClientSocket();
+			
+			// Добавляем новый клиентский сокет в массив fds
+			for (int i = 1; i <= max_client_count; i++) { 
+				// Начинаем с 1, т.к. 0 — это слушающий сокет
+				if (fds[i].fd == -1) {
+					fds[i].fd = client_socket;
+					break;
+				}
+			}
+		}
+
+		// Обрабатываем события для всех клиентских сокетов
+		for (int i = 1; i <= max_client_count; i++) {
+			if (fds[i].fd != -1 && (fds[i].revents & POLLIN)) {
+				if (m_modbus_slave->modbusReceive()) {
+					if (!m_modbus_slave->modbusReply()) {
+						close(fds[i].fd);
+						fds[i].fd = -1; // Освобождаем слот для клиента
+					}
+				}
+			}
+		}
 	}
+}
+
+void ActionManager::rtuPayload() {
+	while (m_run.load()) m_modbus_slave->modbusReceive() && m_modbus_slave->modbusReply();
+		// std::this_thread::sleep_for(std::chrono::milliseconds(200));
 }
 
 } // action

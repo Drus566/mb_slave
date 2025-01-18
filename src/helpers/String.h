@@ -78,6 +78,27 @@ bool endsWith(const std::string& str, const std::string& substr);
  */
 bool isNumber(const std::string& str);
 
+/**
+ * @brief Helper function to check if a string is Integer
+ * @param str String where to check
+ * @return true if the string is Number, false otherwise
+ */
+bool isInteger(const std::string &str);
+
+/**
+ * @brief Helper function to check if a string is Unsigned Integer
+ * @param str String where to check
+ * @return true if the string is Number, false otherwise
+ */
+bool isUnsignedInteger(const std::string &str);
+
+/**
+ * @brief Helper function to check if a string is Float
+ * @param str String where to check
+ * @return true if the string is Number, false otherwise
+ */
+bool isFloat(const std::string& str);
+
 /** 
  * @brief Helper function to create new upper case string from source string
  * @param str String where to upper

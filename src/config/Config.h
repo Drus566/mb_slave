@@ -33,17 +33,15 @@ class Config {
 
     std::string ip() const { return getString(SETTINGS_SECTION, "Ip"); }
     unsigned int port() const { return get<unsigned int>(SETTINGS_SECTION, "Port"); }
+    unsigned int tcpConnectionCount() const { return get<unsigned int>(SETTINGS_SECTION, "TcpConnectionCount"); }
 
-    std::string baudrateStr() const { return getString(SETTINGS_SECTION, "Baudrate"); }
-    std::string stopBitStr() const { return getString(SETTINGS_SECTION, "StopBit"); }
-    std::string dataBitsStr() const { return getString(SETTINGS_SECTION, "DataBits"); }
+    std::string getCoilsArea() const { return getString(AREA_SECTION, "Coils"); }
+    std::string getDiscreteArea() const { return getString(AREA_SECTION, "DiscreteInputs"); }
+    std::string getInputRegsArea() const { return getString(AREA_SECTION, "InputRegisters"); }
+    std::string getHoldingRegsArea() const { return getString(AREA_SECTION, "HoldingRegisters"); }
 
-    unsigned int maxCountRegsRead() const { return get<unsigned int>(SETTINGS_SECTION, "MaxCountRegsRead"); }
-    std::chrono::milliseconds timeBetweenRequests() const { return get<std::chrono::milliseconds>(SETTINGS_SECTION, "TimeBetweenRequests"); }
-    std::chrono::milliseconds responseTimeout() const { return get<std::chrono::milliseconds>(SETTINGS_SECTION, "ResponseTimeout"); }
-    std::chrono::milliseconds pollDelay() const { return get<std::chrono::milliseconds>(SETTINGS_SECTION, "PollDelay"); }
-
-    SectionsMap& getRegs(SectionsMap& map) {
+    bool getRegs(SectionsMap& map) {
+      bool result = false;
       std::vector<std::string> sections = m_config.sections();
       ParamsMap params_map;
 
@@ -52,35 +50,15 @@ class Config {
         if (startsWith(s, COILS_SECTION)              || startsWith(s, F1_SECTION)
           || startsWith(s, DISCRETE_SECTION)          || startsWith(s, F2_SECTION)
           || startsWith(s, INPUT_REGS_SECTION)        || startsWith(s, F4_SECTION)
-          || startsWith(s, HOLDING_REGS_SECTION)      || startsWith(s, F3_SECTION)
-          || startsWith(s, WRITE_WORD_SECTION)        || startsWith(s, WRITE_COIL_SECTION)) {
+          || startsWith(s, HOLDING_REGS_SECTION)      || startsWith(s, F3_SECTION)) {
           std::vector<std::string> params = m_config[s];
           params_map.clear();
           for (auto& p : params) { params_map[p] = m_config.get(s, p); }
           map[s].push_back(params_map);
+          result = true;
         }
-      } 
-      return map;
-    }
-
-    SectionsMap& getAreas(SectionsMap& map) {
-      std::vector<std::string> sections = m_config.sections();
-      ParamsMap params_map;
-
-      for (auto& s : sections) {
-        s = trim(s);
-        if (startsWith(s, AREA_FUNCS_SECTION)
-          || startsWith(s, COILS_AREA_SECTION)        || startsWith(s, F1_AREA_SECTION)
-          || startsWith(s, DISCRETE_AREA_SECTION)     || startsWith(s, F2_AREA_SECTION)
-          || startsWith(s, INPUT_REGS_AREA_SECTION)   || startsWith(s, F4_AREA_SECTION)
-          || startsWith(s, HOLDING_REGS_AREA_SECTION) || startsWith(s, F3_AREA_SECTION)) {
-          std::vector<std::string> params = m_config[s];
-          params_map.clear();
-          for (auto& p : params) { params_map[p] = m_config.get(s, p); }
-          map[s].push_back(params_map);
-        }
-      } 
-      return map;
+      }
+      return result;
     }
       
   private:

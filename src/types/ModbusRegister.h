@@ -7,7 +7,15 @@
 namespace mb {
 namespace types {
 
+struct RegisterValue {
+    union {
+        float f_val;
+        int i_val;
+    };
+};
+
 struct RegisterInfo {
+    RegisterValue value;    // значение данных
     RegDataType data_type;  // тип данных регистра
     RegDataOrder order;     // порядок следования байт
     char precision;         // точность

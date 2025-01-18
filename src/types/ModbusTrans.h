@@ -101,7 +101,20 @@ public:
       	}
 		result = val;
 	}
-	
+
+    static void valToRawReg32(uint16_t* result, Register &r) {
+        RegDataType &data_type = r.reg_info.data_type;
+        RegDataOrder &data_order = r.reg_info.order;
+        int precision = r.reg_info.precision;
+
+        if (data_type == RegDataType::INT32 || data_type == RegDataType::UINT32 || data_type == RegDataType::FLOAT32) {
+            if (data_order == RegDataOrder::AB_CD) modbusSetAbcd(r.reg_info.value.i_val, result);
+            else if (data_order == RegDataOrder::BA_DC) modbusSetBadc(r.reg_info.value.i_val, result);
+            else if (data_order == RegDataOrder::CD_AB) modbusSetCdab(r.reg_info.value.i_val, result);
+            else if (data_order == RegDataOrder::DC_BA) modbusSetDcba(r.reg_info.value.i_val, result);
+        }
+    }
+
     static float modbusGetFloatAbcd(const uint16_t *src) { return static_cast<float>(modbusGetAbcd(src)); }
     static float modbusGetFloatDcba(const uint16_t *src) { return static_cast<float>(modbusGetDcba(src)); }
     static float modbusGetFloatBadc(const uint16_t *src) { return static_cast<float>(modbusGetBadc(src)); }
@@ -122,7 +135,7 @@ public:
     
         /* Set to 4 bytes for Modbus w/o any conversion (ABCD) */
 	template <typename T>
-    void modbusSetAbcd(T val, uint16_t *dest) {
+    static void modbusSetAbcd(T val, uint16_t *dest) {
         T * ptr = &val;
         uint32_t * iptr = (uint32_t *)ptr;
         uint32_t i = *iptr;
@@ -139,7 +152,7 @@ public:
     
     /* Set to 4 bytes for Modbus with byte and word swap conversion (DCBA) */
     template <typename T>
-    void modbusSetDcba(T val, uint16_t *dest) {
+    static void modbusSetDcba(T val, uint16_t *dest) {
         T * ptr = &val;
         uint32_t * iptr = (uint32_t *)ptr;
         uint32_t i = *iptr;
@@ -156,7 +169,7 @@ public:
     
     /* Set to 4 bytes for Modbus with byte swap conversion (BADC) */
     template <typename T>
-    void modbusSetBadc(T val, uint16_t *dest) {
+    static void modbusSetBadc(T val, uint16_t *dest) {
         T * ptr = &val;
         uint32_t * iptr = (uint32_t *)ptr;
         uint32_t i = *iptr;
@@ -173,7 +186,7 @@ public:
     
     /* Set to 4 bytes for Modbus with word swap conversion (CDAB) */
     template <typename T>
-    void modbusSetCdab(T val, uint16_t *dest) {
+    static void modbusSetCdab(T val, uint16_t *dest) {
         T * ptr = &val;
         uint32_t * iptr = (uint32_t *)ptr;
         uint32_t i = *iptr;

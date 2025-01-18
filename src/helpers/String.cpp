@@ -77,7 +77,36 @@ bool endsWith(const std::string& str, const std::string& substr) {
 }
 
 /** @brief Helper function to check if a string is Number */
-bool isNumber(const std::string& str) {
+bool isNumber(const std::string& str) { return isInteger(str) || isUnsignedInteger(str) || isFloat(str); }
+
+/**
+ * @brief Helper function to check if a string is Integer
+ * @param str String where to check
+ * @return true if the string is Number, false otherwise
+ */
+bool isInteger(const std::string &str) {
+    bool result = true;
+    bool first = true;
+    for (char c : str) {
+        if (first) {
+            if (c == '-' || c == '+') continue;
+            first = false;
+        }
+
+        if (!std::isdigit(c)) {
+			result = false;
+			break;
+		}
+    }
+    return result;
+}
+
+/**
+ * @brief Helper function to check if a string is Unsigned Integer
+ * @param str String where to check
+ * @return true if the string is Number, false otherwise
+ */
+bool isUnsignedInteger(const std::string &str) {
     bool result = true;
     for (char c : str) {
         if (!std::isdigit(c)) {
@@ -86,6 +115,36 @@ bool isNumber(const std::string& str) {
 		}
     }
     return result;
+}
+
+/** @brief Helper function to check if a string is Number */
+bool isFloat(const std::string& str) {
+    bool result = true;
+    const char* c_str = str.c_str();
+    bool comma = false; // Флаг наличия десятичной точки
+    int i = 0;
+    
+    // Проверяем знак числа в начале строки
+    if (c_str[i] == '-' || c_str[i] == '+') i++;
+
+    if (i > 0 && str.size() < 2) result = false;
+
+    // Проходим по каждому символу строки
+    for (; c_str[i] != '\0'; i++) {
+        if (c_str[i] == '.') {
+            if (comma) {
+                result = false; // Более одной точки — ошибка
+                break;
+            }
+            comma = true;
+        } 
+        else if (!isdigit(c_str[i])) {
+            result = false;
+            break;
+        }
+    }
+
+    return result; // Строка должна содержать хотя бы одну цифру
 }
 
 /** @brief Helper function to create new upper case string from source string */

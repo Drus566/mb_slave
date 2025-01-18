@@ -9,13 +9,13 @@ namespace types {
 /** @brief типы данных регистров */
 enum class ModbusConnectionType {
 	NONE,
-   	RTU,
-   	ETH
+   RTU,
+   ETH
 };
 
 struct ModbusConnection {
 	ModbusConnectionType type;
-	int response_timeout;
+	int slave_id;
 	
 	struct {
 		std::string serial_port;
@@ -28,24 +28,9 @@ struct ModbusConnection {
 	struct {
 		std::string ip;
 		int port;
+		int tcp_count_connections;
 	} eth;
 };
-
-
-// преобразование enum в строку
-// inline const char* RegDataTypeToString(RegDataType e) noexcept {
-//     switch(e) {
-//         case RegDataType::UINT16:  return "UINT16";
-//         case RegDataType::INT16:   return "INT16";
-//         case RegDataType::FLOAT16: return "FLOAT16";
-//         case RegDataType::FLOAT32: return "FLOAT32";
-//         case RegDataType::INT32:   return "INT32";
-//         case RegDataType::UINT32:  return "UINT32";
-//     }
-//     return "";
-// };
-
-// inline bool isFloatDataType(RegDataType& type) { return (type == RegDataType::FLOAT16 || type == RegDataType::FLOAT32); }
 
 } // types
 } // mb

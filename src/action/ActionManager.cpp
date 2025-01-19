@@ -81,6 +81,8 @@ bool ActionManager::start(bool wait) {
 	
 	if (!m_modbus_slave->setContext()) return false;
 
+	m_modbus_slave->setDebug();
+
 	MemoryMapInfo mem_map_info;
 	m_data_manager->getMemoryMapInfo(mem_map_info);
 

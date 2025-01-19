@@ -25,6 +25,8 @@ public:
     bool setContext();
     bool setContext(const ModbusConnection& connection);
 
+    void setDebug();
+
     /** @brief connect on current context */
     bool connect();
 

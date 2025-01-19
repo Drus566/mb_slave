@@ -2,7 +2,9 @@
 
 #include "ModbusEnums.h"
 #include "ModbusTrans.h"
+
 #include <unistd.h>
+#include <iostream>
 
 namespace mb {
 namespace action {
@@ -49,6 +51,8 @@ bool ModbusSlave::setContext(const ModbusConnection& connection) {
 }
 
 bool ModbusSlave::setContext() { return setContext(m_connection); }
+
+void ModbusSlave::setDebug() { modbus_set_debug(m_ctx, TRUE); }
 
 bool ModbusSlave::connect() {
 	bool result = true;
@@ -156,7 +160,13 @@ bool ModbusSlave::modbusReceive() {
 	if (length != -1) {
 		m_query.length = length;
 		result = true;
+		for (int i = 0; i < m_query.length; i++)
+		{
+			printf("%02X ", m_query.query[i]);
+		}
+		printf("\n");
 	}
+
 	return result;
 }
 

@@ -220,7 +220,7 @@ void ModbusSlave::fillModbusMemory(std::forward_list<Register>& regs) {
 
 	for (auto& r : regs) {
 		if (r.function == FuncNumber::READ_COIL && m_mem.length_bits > 0) {
-			index = r.address - m_mem.offset_bits - 1;
+			index = r.address - m_mem.offset_bits;
 			if (index >= 0 && index < m_mem.length_bits) {
 				if (r.reg_info.value.i_val != 0) i_val = 1;
 				else i_val = 0;
@@ -228,7 +228,7 @@ void ModbusSlave::fillModbusMemory(std::forward_list<Register>& regs) {
 			}
 		}
 		else if (r.function == FuncNumber::READ_INPUT_COIL && m_mem.length_input_bits > 0) {
-			index = r.address - m_mem.offset_input_bits - 1;
+			index = r.address - m_mem.offset_input_bits;
 			if (index >= 0 && index < m_mem.length_input_bits) {
 				if (r.reg_info.value.i_val != 0) i_val = 1;
 				else i_val = 0;
@@ -236,7 +236,7 @@ void ModbusSlave::fillModbusMemory(std::forward_list<Register>& regs) {
 			}
 		}
 		else if (r.function == FuncNumber::READ_REGS && m_mem.length_regs > 0) {
-			index = r.address - m_mem.offset_regs - 1;
+			index = r.address - m_mem.offset_regs;
 			if (index >= 0 && index < m_mem.length_regs) {
 				type = r.reg_info.data_type;
 				if (isDwordDataType(type) && ((index + 1) < m_mem.length_regs)) {
@@ -258,7 +258,7 @@ void ModbusSlave::fillModbusMemory(std::forward_list<Register>& regs) {
 			}
 		}
 		else if (r.function == FuncNumber::READ_INPUT_REGS && m_mem.length_input_regs > 0) {
-			index = r.address - m_mem.offset_regs - 1;
+			index = r.address - m_mem.offset_regs;
 			if (index >= 0 && index < m_mem.length_regs) {
 				type = r.reg_info.data_type;
 				if (isDwordDataType(type) && ((index + 1) < m_mem.length_input_regs)) {

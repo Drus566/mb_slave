@@ -133,6 +133,7 @@ bool ActionManager::isConnect() { return m_connect.load(); };
 void ActionManager::payload() {
 	m_run.store(true);
 
+	m_modbus_slave->flush();
 	if (m_modbus_connection.type == ModbusConnectionType::RTU) rtuPayload();
 	else if (m_modbus_connection.type == ModbusConnectionType::ETH) tcpPayload();
 }
@@ -175,12 +176,26 @@ void ActionManager::tcpPayload() {
 
 		// Обрабатываем события для всех клиентских сокетов
 		for (int i = 1; i <= max_client_count; i++) {
-			if (fds[i].fd != -1 && (fds[i].revents & POLLIN)) {
-				if (m_modbus_slave->modbusReceive()) {
-					if (!m_modbus_slave->modbusReply()) {
+			if (fds[i].fd != -1) {
+				if (fds[i].revents & POLLIN) {
+					if (m_modbus_slave->modbusReceive()) {
+						if (!m_modbus_slave->modbusReply()) {
+							close(fds[i].fd);
+							fds[i].fd = -1; // Освобождаем слот для клиента
+						}
+					}
+					else {
 						close(fds[i].fd);
 						fds[i].fd = -1; // Освобождаем слот для клиента
 					}
+				}
+				else if (fds[i].revents & POLLERR) {
+					close(fds[i].fd);
+					fds[i].fd = -1; // Освобождаем слот для клиента
+				}
+				else if (fds[i].revents & POLLHUP) {
+					close(fds[i].fd);
+					fds[i].fd = -1; // Освобождаем слот для клиента
 				}
 			}
 		}

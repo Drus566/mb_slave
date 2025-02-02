@@ -15,9 +15,9 @@ int main(void) {
 	// if (g == nullptr) std::cout << "GGWP" << std::endl;
 	// g->getBit();
 
-	// while(true) {
-	// 	std::this_thread::sleep_for(std::chrono::milliseconds(200));
-	// }
+	while(true) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(200));
+	}
 	// g.getBit();
 	
 	// mb::MB mb(path_config);
